@@ -256,7 +256,7 @@ static void put_scan_data(struct scan_data *data)
 }
 
 /* Fetch the latest AP scan data and make it available. */
-static void wifi_scan_done(system_event_t *event)
+static void wifi_scan_done(int32_t event_id, void* event_data)
 {
     uint16_t num_aps;
     struct scan_data *old, *new;
@@ -270,7 +270,7 @@ static void wifi_scan_done(system_event_t *event)
 
     /* Receiving anything other than scan done means something is *\
     \* really messed up.                                          */
-    configASSERT(event->event_id == SYSTEM_EVENT_SCAN_DONE);
+    configASSERT(event_id == WIFI_EVENT_SCAN_DONE);
 
     if(atomic_load(&scan_in_progress) == false){
         /* Either scan was cancelled due to timeout or somebody else *\
@@ -279,10 +279,9 @@ static void wifi_scan_done(system_event_t *event)
                 __FUNCTION__);
         return;
     }
-
-    if(event->event_info.scan_done.status != ESP_OK){
-        ESP_LOGI(TAG, "Scan failed. Event status: 0x%x",
-                event->event_info.scan_done.status);
+    wifi_event_sta_scan_done_t* event = (wifi_event_sta_scan_done_t*) event_data;
+    if(event->status != ESP_OK){
+        ESP_LOGI(TAG, "Scan failed. Event status: 0x%x", event->status);
         goto err_out;
     }
 
@@ -871,28 +870,27 @@ static const char *event_names[] = {
 /* Update state information from system events. This function must be   *\
  * called from the main event handler to keep this module updated about *
 \* the current system state.                                            */
-void cgiWifiEventCb(system_event_t *event)
+void cgiWifiEventCb(int32_t event_id, void* event_data)
 {
-    ESP_LOGD(TAG, "[%s] Received %s.",
-            __FUNCTION__, event_names[event->event_id]);
+    ESP_LOGD(TAG, "[%s] Received %s.", __FUNCTION__, event_names[event_id]);
 
-    switch(event->event_id){
-    case SYSTEM_EVENT_SCAN_DONE:
-        wifi_scan_done(event);
+    switch(event_id){
+    case WIFI_EVENT_SCAN_DONE:
+        wifi_scan_done(event_id, event_data);
         break;
-    case SYSTEM_EVENT_STA_GOT_IP:
-    case SYSTEM_EVENT_GOT_IP6:
+    case IP_EVENT_STA_GOT_IP:
+    case IP_EVENT_GOT_IP6:
         xEventGroupSetBits(wifi_events, BIT_CONNECTED);
         break;
-    case SYSTEM_EVENT_STA_DISCONNECTED:
+    case WIFI_EVENT_STA_DISCONNECTED:
         xEventGroupClearBits(wifi_events, BIT_CONNECTED);
         break;
-    case SYSTEM_EVENT_STA_WPS_ER_SUCCESS:
+    case WIFI_EVENT_STA_WPS_ER_SUCCESS:
         xEventGroupSetBits(wifi_events, BIT_WPS_SUCCESS);
         break;
-    case SYSTEM_EVENT_STA_WPS_ER_FAILED:
-    case SYSTEM_EVENT_STA_WPS_ER_TIMEOUT:
-    case SYSTEM_EVENT_STA_WPS_ER_PIN:
+    case WIFI_EVENT_STA_WPS_ER_FAILED:
+    case WIFI_EVENT_STA_WPS_ER_TIMEOUT:
+    case WIFI_EVENT_STA_WPS_ER_PIN:
         xEventGroupSetBits(wifi_events, BIT_WPS_FAILED);
         break;
     default:
