@@ -181,6 +181,11 @@ CgiStatus ICACHE_FLASH_ATTR cgiWebSocketRecv(HttpdInstance *pInstance, HttpdConn
 	int r=HTTPD_CGI_MORE;
 	int wasHeaderByte;
 	Websock *ws=(Websock*)connData->cgiData;
+	// unpredictable situation that happens when disconnecting from socket
+	// todo: should investigate more why this happens
+	if (ws == NULL) {
+        return HTTPD_CGI_DONE;
+	}
 	for (i=0; i<len; i++) {
 //		httpd_printf("Ws: State %d byte 0x%02X\n", ws->priv->wsStatus, data[i]);
 		wasHeaderByte=1;
